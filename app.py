@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 import config
 import rag_engine
+import security
 
 st.set_page_config(page_title="Guard-RAG - Fase 1", page_icon="🛡️", layout="wide")
 
@@ -66,6 +67,23 @@ with st.sidebar:
                         st.error("No se pudo extraer texto del PDF.")
                         st.stop()
 
+                    clean_chunks, flagged_chunks = security.scan_chunks(chunks)
+
+                    if flagged_chunks:
+                        st.warning(
+                            f"Se detectaron {len(flagged_chunks)} fragmento(s) "
+                            f"con patrones sospechosos de inyeccion de prompt. "
+                            f"Fueron excluidos del indice por seguridad."
+                        )
+                        for item in flagged_chunks:
+                            matched_phrases = ", ".join(m.matched_text for m in item["matches"])
+                            st.caption(f"⚠️ Patron detectado: \"{matched_phrases}\"")
+
+                    if not clean_chunks:
+                        st.error("Todos los fragmentos fueron marcados como sospechosos. Proceso cancelado.")
+                        st.stop()
+
+                    chunks = clean_chunks
                     embeddings = rag_engine.get_embeddings(
                         backend=backend,
                         openai_api_key=openai_api_key,
