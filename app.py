@@ -46,8 +46,6 @@ with st.sidebar:
 
     process_clicked = st.button("🔍 Procesar PDF", use_container_width=True)
 
-
-
     if process_clicked:
         if uploaded_pdf is None:
             st.error("Primero subi un archivo PDF.")
@@ -70,6 +68,7 @@ with st.sidebar:
                     clean_chunks, flagged_chunks = security.scan_chunks(chunks)
 
                     if flagged_chunks:
+                        security.log_detection(uploaded_pdf.name, flagged_chunks)
                         st.warning(
                             f"Se detectaron {len(flagged_chunks)} fragmento(s) "
                             f"con patrones sospechosos de inyeccion de prompt. "
@@ -118,9 +117,6 @@ with st.sidebar:
 
     if st.session_state.processed_file:
         st.info(f"Documento activo: {st.session_state.processed_file}")
-
-
-
 
 st.title("🛡️ Guard-RAG — Fase 1")
 st.caption("Conversa con tu PDF. El pipeline corre localmente (o con OpenAI si lo elegis).")

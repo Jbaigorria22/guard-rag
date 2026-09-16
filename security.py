@@ -73,3 +73,17 @@ def scan_chunks(chunks) -> tuple:
             clean_chunks.append(chunk)
 
     return clean_chunks, flagged_chunks
+
+
+
+
+
+def log_detection(pdf_filename: str, flagged_chunks: list, log_path: str = "security_events.log") -> None:
+    """Registra en un archivo de log cada deteccion de inyeccion de prompt."""
+    from datetime import datetime
+
+    with open(log_path, "a", encoding="utf-8") as f:
+        for item in flagged_chunks:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            phrases = "; ".join(m.matched_text for m in item["matches"])
+            f.write(f"[{timestamp}] archivo={pdf_filename} | patrones_detectados=\"{phrases}\"\n")
