@@ -87,3 +87,14 @@ def log_detection(pdf_filename: str, flagged_chunks: list, log_path: str = "secu
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             phrases = "; ".join(m.matched_text for m in item["matches"])
             f.write(f"[{timestamp}] archivo={pdf_filename} | patrones_detectados=\"{phrases}\"\n")
+
+
+
+def check_output(answer: str) -> bool:
+    """
+    Revisa la respuesta del LLM antes de mostrarla al usuario.
+    Reutiliza los mismos patrones de inyeccion: si el LLM esta a punto
+    de repetir o confirmar una instruccion maliciosa, lo detectamos aca
+    como ultima barrera antes de la pantalla.
+    """
+    return is_suspicious(answer)

@@ -146,6 +146,18 @@ if user_question:
                     }
                 )
                 answer = response["answer"]
+
+                if security.check_output(answer):
+                    security.log_detection(
+                        st.session_state.processed_file,
+                        [{"chunk": None, "matches": security.scan_text(answer)}],
+                    )
+                    answer = (
+                        "No puedo mostrar esta respuesta porque contiene contenido "
+                        "que coincide con patrones de seguridad sospechosos. "
+                        "Reformula tu pregunta o revisa el documento fuente."
+                    )
+
                 st.markdown(answer)
             except Exception as e:
                 answer = f"Ocurrio un error al generar la respuesta: {e}"
