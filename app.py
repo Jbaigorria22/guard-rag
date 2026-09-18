@@ -16,6 +16,10 @@ if "rag_chain" not in st.session_state:
     st.session_state.rag_chain = None
 if "processed_file" not in st.session_state:
     st.session_state.processed_file = None
+if "question_timestamps" not in st.session_state:
+    st.session_state.question_timestamps = []
+
+rate_limiter = security.RateLimiter(max_requests=10, window_seconds=60)
 
 with st.sidebar:
     st.header("🛡️ Guard-RAG - Configuracion")
@@ -129,6 +133,17 @@ for message in st.session_state.chat_history:
 user_question = st.chat_input("Preguntale algo a tu PDF...")
 
 if user_question:
+    if not rate_limiter.is_allowed(st.session_state.question_timestamps):
+        st.error(
+            "Alcanzaste el limite de preguntas permitidas (10 por minuto). "
+            "Espera un momento antes de volver a preguntar."
+        )
+        st.stop()
+
+    st.session_state.question_timestamps = rate_limiter.record(
+        st.session_state.question_timestamps
+    )
+
     if st.session_state.rag_chain is None:
         st.warning("Primero subi y procesa un PDF desde la barra lateral.")
         st.stop()

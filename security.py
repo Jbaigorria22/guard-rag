@@ -98,3 +98,37 @@ def check_output(answer: str) -> bool:
     como ultima barrera antes de la pantalla.
     """
     return is_suspicious(answer)
+
+
+
+
+import time
+
+
+class RateLimiter:
+    """
+    Limita la cantidad de acciones (preguntas) permitidas en una
+    ventana de tiempo. Guarda los timestamps de las acciones recientes
+    en una lista simple.
+    """
+
+    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+
+    def is_allowed(self, timestamps: list) -> bool:
+        """
+        Recibe la lista de timestamps guardada en session_state.
+        Devuelve True si se puede hacer una accion mas, False si se
+        supero el limite dentro de la ventana de tiempo.
+        """
+        now = time.time()
+        recent = [t for t in timestamps if now - t < self.window_seconds]
+        return len(recent) < self.max_requests
+
+    def record(self, timestamps: list) -> list:
+        """Agrega el timestamp actual y descarta los que ya vencieron."""
+        now = time.time()
+        recent = [t for t in timestamps if now - t < self.window_seconds]
+        recent.append(now)
+        return recent
