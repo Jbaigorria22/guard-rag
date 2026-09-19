@@ -73,16 +73,9 @@ def get_retriever(vectorstore, k=config.RETRIEVER_K):
 
 
 def build_rag_chain(llm, retriever):
-    contextualize_q_system_prompt = (
-        "Dado un historial de chat y la ultima pregunta del usuario, la cual "
-        "puede hacer referencia a contexto previo del historial, reformula "
-        "la pregunta para que sea entendible de forma completamente "
-        "independiente. NO respondas la pregunta, solo reformulala si es "
-        "necesario; si ya es autonoma, devolvela tal cual."
-    )
     contextualize_q_prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", contextualize_q_system_prompt),
+            ("system", config.CONTEXTUALIZE_SYSTEM_PROMPT),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}"),
         ]
@@ -91,15 +84,9 @@ def build_rag_chain(llm, retriever):
         llm, retriever, contextualize_q_prompt
     )
 
-    qa_system_prompt = (
-        "Sos un asistente experto que responde preguntas basandote "
-        "UNICAMENTE en el siguiente contexto extraido de un documento PDF. "
-        "Si la respuesta no esta en el contexto, decilo explicitamente. "
-        "No inventes datos.\n\nContexto:\n{context}"
-    )
     qa_prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", qa_system_prompt),
+            ("system", config.QA_SYSTEM_PROMPT),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}"),
         ]
