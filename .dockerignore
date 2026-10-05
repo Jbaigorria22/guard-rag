@@ -6,3 +6,5 @@ chroma_db/
 .git/
 .gitignore
 security_events.log
+terraform/
+*.tfstate
