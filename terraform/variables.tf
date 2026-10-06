@@ -21,3 +21,14 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.0.0.0/16"
 }
+
+
+variable "allowed_ingress_cidr" {
+  description = "CIDR autorizado a llegar al ALB (tu IP publica con /32)."
+  type        = string
+
+  validation {
+    condition     = can(cidrhost(var.allowed_ingress_cidr, 0)) && var.allowed_ingress_cidr != "0.0.0.0/0"
+    error_message = "Usa un CIDR valido y nunca 0.0.0.0/0, que abre el ALB a todo internet."
+  }
+}
