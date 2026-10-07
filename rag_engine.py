@@ -8,6 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_chroma import Chroma
+from langchain_aws import ChatBedrockConverse, BedrockEmbeddings
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
@@ -32,6 +33,8 @@ def get_embeddings(backend, openai_api_key=None, ollama_url=config.OLLAMA_DEFAUL
         return OpenAIEmbeddings(model=config.OPENAI_DEFAULT_EMBED_MODEL, api_key=openai_api_key)
     elif backend == "ollama":
         return OllamaEmbeddings(model=ollama_embed_model, base_url=ollama_url)
+    elif backend == "bedrock":
+        return BedrockEmbeddings(model_id=config.BEDROCK_EMBED_MODEL_ID, region_name=config.AWS_REGION)
     raise ValueError(f"Backend de embeddings desconocido: {backend}")
 
 
@@ -42,6 +45,12 @@ def get_llm(backend, openai_api_key=None, ollama_url=config.OLLAMA_DEFAULT_URL, 
         return ChatOpenAI(model=config.OPENAI_DEFAULT_CHAT_MODEL, api_key=openai_api_key, temperature=temperature)
     elif backend == "ollama":
         return ChatOllama(model=ollama_chat_model, base_url=ollama_url, temperature=temperature)
+    elif backend == "bedrock":
+        return ChatBedrockConverse(
+            model=config.BEDROCK_CHAT_MODEL_ID,
+            region_name=config.AWS_REGION,
+            temperature=temperature,
+        )
     raise ValueError(f"Backend de LLM desconocido: {backend}")
 
 def sanitize_collection_name(raw_name: str) -> str:

@@ -24,11 +24,13 @@ rate_limiter = security.RateLimiter(max_requests=10, window_seconds=60)
 with st.sidebar:
     st.header("🛡️ Guard-RAG - Configuracion")
 
-    backend_choice = st.selectbox(
-        "Backend de IA",
-        options=["Opcion A: OpenAI", "Opcion B: Ollama (100% Local)"],
-    )
-    backend = "openai" if backend_choice.startswith("Opcion A") else "ollama"
+    BACKENDS = {
+        "Opcion A: OpenAI": "openai",
+        "Opcion B: Ollama (100% Local)": "ollama",
+        "Opcion C: Amazon Bedrock (AWS)": "bedrock",
+    }
+    backend_choice = st.selectbox("Backend de IA", options=list(BACKENDS))
+    backend = BACKENDS[backend_choice]
 
     openai_api_key = None
     ollama_url = config.OLLAMA_DEFAULT_URL
@@ -38,6 +40,10 @@ with st.sidebar:
     if backend == "openai":
         openai_api_key = st.text_input("OpenAI API Key", type="password")
         embed_model_label = config.OPENAI_DEFAULT_EMBED_MODEL
+    elif backend == "bedrock":
+        st.caption(f"Region: {config.AWS_REGION} | Chat: Claude Haiku 4.5 | Embeddings: Titan v2")
+        st.caption("Usa las credenciales de AWS del entorno (sin API key).")
+        embed_model_label = config.BEDROCK_EMBED_MODEL_ID
     else:
         ollama_url = st.text_input("URL de Ollama", value=config.OLLAMA_DEFAULT_URL)
         ollama_chat_model = st.text_input("Modelo de chat (Ollama)", value=config.OLLAMA_DEFAULT_CHAT_MODEL)
