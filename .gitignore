@@ -9,3 +9,6 @@ terraform/.terraform/
 *.tfstate.*
 *.tfvars
 crash.log
+venv-eval/
+eval/results/
+eval/dryrun.txt
