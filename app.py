@@ -69,8 +69,6 @@ with st.sidebar:
                         st.error("No se pudo extraer texto del PDF.")
                         st.stop()
 
-                    clean_chunks, flagged_chunks = security.scan_chunks(chunks)
-
                     llm_for_check = rag_engine.get_llm(
                         backend=backend,
                         openai_api_key=openai_api_key,
@@ -78,19 +76,7 @@ with st.sidebar:
                         ollama_chat_model=ollama_chat_model,
                     )
 
-                    still_clean = []
-                    for chunk in clean_chunks:
-                        if security.llm_check_chunk(chunk.page_content, llm_for_check):
-                            flagged_chunks.append({
-                                "chunk": chunk,
-                                "matches": [security.InjectionMatch(
-                                    pattern="llm_semantic_check",
-                                    matched_text="(detectado por analisis semantico del LLM)",
-                                )],
-                            })
-                        else:
-                            still_clean.append(chunk)
-                    clean_chunks = still_clean
+                    clean_chunks, flagged_chunks = security.filter_chunks(chunks, llm_for_check)
 
                     if flagged_chunks:
                         security.log_detection(uploaded_pdf.name, flagged_chunks)
@@ -183,19 +169,14 @@ if user_question:
                 )
                 answer = response["answer"]
 
-                leaked = security.check_prompt_leak(
+                answer, blocked, matches = security.guard_answer(
                     answer, [config.QA_SYSTEM_PROMPT, config.CONTEXTUALIZE_SYSTEM_PROMPT]
                 )
 
-                if security.check_output(answer) or leaked:
+                if blocked:
                     security.log_detection(
                         st.session_state.processed_file,
-                        [{"chunk": None, "matches": security.scan_text(answer)}],
-                    )
-                    answer = (
-                        "No puedo mostrar esta respuesta porque contiene contenido "
-                        "que coincide con patrones de seguridad sospechosos. "
-                        "Reformula tu pregunta o revisa el documento fuente."
+                        [{"chunk": None, "matches": matches}],
                     )
 
                 st.markdown(answer)

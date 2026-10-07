@@ -188,3 +188,48 @@ def check_prompt_leak(answer: str, system_prompts: list) -> bool:
             return True
 
     return False
+
+
+BLOCKED_ANSWER_MESSAGE = (
+    "No puedo mostrar esta respuesta porque contiene contenido "
+    "que coincide con patrones de seguridad sospechosos. "
+    "Reformula tu pregunta o revisa el documento fuente."
+)
+
+
+def filter_chunks(chunks, llm) -> tuple:
+    """
+    Filtro completo de chunks en dos capas: regex (scan_chunks) y chequeo
+    semantico del LLM (llm_check_chunk).
+    Devuelve (chunks_limpios, chunks_sospechosos). Cada sospechoso es un
+    dict con el chunk y las coincidencias que lo marcaron.
+    """
+    clean_chunks, flagged_chunks = scan_chunks(chunks)
+
+    still_clean = []
+    for chunk in clean_chunks:
+        if llm_check_chunk(chunk.page_content, llm):
+            flagged_chunks.append({
+                "chunk": chunk,
+                "matches": [InjectionMatch(
+                    pattern="llm_semantic_check",
+                    matched_text="(detectado por analisis semantico del LLM)",
+                )],
+            })
+        else:
+            still_clean.append(chunk)
+
+    return still_clean, flagged_chunks
+
+
+def guard_answer(answer: str, system_prompts: list) -> tuple:
+    """
+    Ultima barrera antes de mostrar una respuesta: revisa fuga del system
+    prompt y patrones de inyeccion en la salida.
+    Devuelve (respuesta_final, fue_bloqueada, coincidencias).
+    Es una funcion pura: no escribe logs; quien la llama decide si registrar.
+    """
+    leaked = check_prompt_leak(answer, system_prompts)
+    if check_output(answer) or leaked:
+        return BLOCKED_ANSWER_MESSAGE, True, scan_text(answer)
+    return answer, False, []
