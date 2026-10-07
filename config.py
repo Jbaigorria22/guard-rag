@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
@@ -12,8 +12,8 @@ OLLAMA_DEFAULT_EMBED_MODEL = "nomic-embed-text"
 OPENAI_DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 OPENAI_DEFAULT_EMBED_MODEL = "text-embedding-3-small"
 
-# Amazon Bedrock: las credenciales NO van aca. boto3 las toma solo
-# (perfil de ~/.aws en local, rol IAM de la tarea en ECS).
+# Amazon Bedrock: credentials do NOT go here. boto3 picks them up on its own
+# (an ~/.aws profile locally, the task IAM role on ECS).
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 BEDROCK_CHAT_MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 BEDROCK_EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
@@ -24,16 +24,17 @@ os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
 
 
 QA_SYSTEM_PROMPT = (
-    "Sos un asistente experto que responde preguntas basandote "
-    "UNICAMENTE en el siguiente contexto extraido de un documento PDF. "
-    "Si la respuesta no esta en el contexto, decilo explicitamente. "
-    "No inventes datos.\n\nContexto:\n{context}"
+    "You are an expert assistant that answers questions based ONLY on "
+    "the following context extracted from a PDF document. "
+    "If the answer is not in the context, say so explicitly. "
+    "Do not make up facts. Answer in the same language as the user's "
+    "question.\n\nContext:\n{context}"
 )
 
 CONTEXTUALIZE_SYSTEM_PROMPT = (
-    "Dado un historial de chat y la ultima pregunta del usuario, la cual "
-    "puede hacer referencia a contexto previo del historial, reformula "
-    "la pregunta para que sea entendible de forma completamente "
-    "independiente. NO respondas la pregunta, solo reformulala si es "
-    "necesario; si ya es autonoma, devolvela tal cual."
+    "Given a chat history and the user's latest question, which may "
+    "refer to earlier context in the history, rewrite the question so "
+    "that it can be understood completely on its own. Do NOT answer the "
+    "question, only rewrite it if needed; if it already stands on its "
+    "own, return it unchanged. Keep the question in its original language."
 )

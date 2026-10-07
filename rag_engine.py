@@ -1,4 +1,4 @@
-﻿import re
+import re
 from typing import List, Optional
 
 from langchain_core.documents import Document
@@ -29,19 +29,19 @@ def load_and_split_pdf(pdf_path: str) -> List[Document]:
 def get_embeddings(backend, openai_api_key=None, ollama_url=config.OLLAMA_DEFAULT_URL, ollama_embed_model=config.OLLAMA_DEFAULT_EMBED_MODEL):
     if backend == "openai":
         if not openai_api_key:
-            raise ValueError("Falta la API Key de OpenAI para generar embeddings.")
+            raise ValueError("Missing OpenAI API key for embeddings.")
         return OpenAIEmbeddings(model=config.OPENAI_DEFAULT_EMBED_MODEL, api_key=openai_api_key)
     elif backend == "ollama":
         return OllamaEmbeddings(model=ollama_embed_model, base_url=ollama_url)
     elif backend == "bedrock":
         return BedrockEmbeddings(model_id=config.BEDROCK_EMBED_MODEL_ID, region_name=config.AWS_REGION)
-    raise ValueError(f"Backend de embeddings desconocido: {backend}")
+    raise ValueError(f"Unknown embeddings backend: {backend}")
 
 
 def get_llm(backend, openai_api_key=None, ollama_url=config.OLLAMA_DEFAULT_URL, ollama_chat_model=config.OLLAMA_DEFAULT_CHAT_MODEL, temperature=0.1):
     if backend == "openai":
         if not openai_api_key:
-            raise ValueError("Falta la API Key de OpenAI para el modelo de chat.")
+            raise ValueError("Missing OpenAI API key for the chat model.")
         return ChatOpenAI(model=config.OPENAI_DEFAULT_CHAT_MODEL, api_key=openai_api_key, temperature=temperature)
     elif backend == "ollama":
         return ChatOllama(model=ollama_chat_model, base_url=ollama_url, temperature=temperature)
@@ -51,7 +51,7 @@ def get_llm(backend, openai_api_key=None, ollama_url=config.OLLAMA_DEFAULT_URL, 
             region_name=config.AWS_REGION,
             temperature=temperature,
         )
-    raise ValueError(f"Backend de LLM desconocido: {backend}")
+    raise ValueError(f"Unknown LLM backend: {backend}")
 
 def sanitize_collection_name(raw_name: str) -> str:
     name = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_name)

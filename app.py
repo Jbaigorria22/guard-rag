@@ -1,4 +1,4 @@
-﻿import os
+import os
 import tempfile
 
 import streamlit as st
@@ -8,7 +8,7 @@ import config
 import rag_engine
 import security
 
-st.set_page_config(page_title="Guard-RAG - Fase 1", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Guard-RAG", page_icon="🛡️", layout="wide")
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -22,14 +22,14 @@ if "question_timestamps" not in st.session_state:
 rate_limiter = security.RateLimiter(max_requests=10, window_seconds=60)
 
 with st.sidebar:
-    st.header("🛡️ Guard-RAG - Configuracion")
+    st.header("🛡️ Guard-RAG - Settings")
 
     BACKENDS = {
-        "Opcion A: OpenAI": "openai",
-        "Opcion B: Ollama (100% Local)": "ollama",
-        "Opcion C: Amazon Bedrock (AWS)": "bedrock",
+        "Option A: OpenAI": "openai",
+        "Option B: Ollama (100% local)": "ollama",
+        "Option C: Amazon Bedrock (AWS)": "bedrock",
     }
-    backend_choice = st.selectbox("Backend de IA", options=list(BACKENDS))
+    backend_choice = st.selectbox("AI backend", options=list(BACKENDS))
     backend = BACKENDS[backend_choice]
 
     openai_api_key = None
@@ -42,28 +42,28 @@ with st.sidebar:
         embed_model_label = config.OPENAI_DEFAULT_EMBED_MODEL
     elif backend == "bedrock":
         st.caption(f"Region: {config.AWS_REGION} | Chat: Claude Haiku 4.5 | Embeddings: Titan v2")
-        st.caption("Usa las credenciales de AWS del entorno (sin API key).")
+        st.caption("Uses the AWS credentials of the environment (no API key).")
         embed_model_label = config.BEDROCK_EMBED_MODEL_ID
     else:
-        ollama_url = st.text_input("URL de Ollama", value=config.OLLAMA_DEFAULT_URL)
-        ollama_chat_model = st.text_input("Modelo de chat (Ollama)", value=config.OLLAMA_DEFAULT_CHAT_MODEL)
-        ollama_embed_model = st.text_input("Modelo de embeddings (Ollama)", value=config.OLLAMA_DEFAULT_EMBED_MODEL)
+        ollama_url = st.text_input("Ollama URL", value=config.OLLAMA_DEFAULT_URL)
+        ollama_chat_model = st.text_input("Chat model (Ollama)", value=config.OLLAMA_DEFAULT_CHAT_MODEL)
+        ollama_embed_model = st.text_input("Embeddings model (Ollama)", value=config.OLLAMA_DEFAULT_EMBED_MODEL)
         embed_model_label = ollama_embed_model
 
     st.divider()
 
-    uploaded_pdf = st.file_uploader("Subi un PDF", type=["pdf"])
+    uploaded_pdf = st.file_uploader("Upload a PDF", type=["pdf"])
 
-    process_clicked = st.button("🔍 Procesar PDF", use_container_width=True)
+    process_clicked = st.button("🔍 Process PDF", use_container_width=True)
 
     if process_clicked:
         if uploaded_pdf is None:
-            st.error("Primero subi un archivo PDF.")
+            st.error("Upload a PDF file first.")
         elif backend == "openai" and not openai_api_key:
-            st.error("Ingresa tu OpenAI API Key para continuar.")
+            st.error("Enter your OpenAI API key to continue.")
         else:
             try:
-                with st.spinner("Procesando PDF..."):
+                with st.spinner("Processing PDF..."):
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                         tmp_file.write(uploaded_pdf.getvalue())
                         tmp_path = tmp_file.name
@@ -72,7 +72,7 @@ with st.sidebar:
                     os.remove(tmp_path)
 
                     if not chunks:
-                        st.error("No se pudo extraer texto del PDF.")
+                        st.error("Could not extract text from the PDF.")
                         st.stop()
 
                     llm_for_check = rag_engine.get_llm(
@@ -87,16 +87,16 @@ with st.sidebar:
                     if flagged_chunks:
                         security.log_detection(uploaded_pdf.name, flagged_chunks)
                         st.warning(
-                            f"Se detectaron {len(flagged_chunks)} fragmento(s) "
-                            f"con patrones sospechosos de inyeccion de prompt. "
-                            f"Fueron excluidos del indice por seguridad."
+                            f"Detected {len(flagged_chunks)} chunk(s) "
+                            f"with suspicious prompt-injection patterns. "
+                            f"They were excluded from the index for security."
                         )
                         for item in flagged_chunks:
                             matched_phrases = ", ".join(m.matched_text for m in item["matches"])
-                            st.caption(f"⚠️ Patron detectado: \"{matched_phrases}\"")
+                            st.caption(f"⚠️ Pattern detected: \"{matched_phrases}\"")
 
                     if not clean_chunks:
-                        st.error("Todos los fragmentos fueron marcados como sospechosos. Proceso cancelado.")
+                        st.error("All chunks were flagged as suspicious. Processing cancelled.")
                         st.stop()
 
                     chunks = clean_chunks
@@ -128,28 +128,28 @@ with st.sidebar:
                     st.session_state.processed_file = uploaded_pdf.name
                     st.session_state.chat_history = []
 
-                st.success(f"'{uploaded_pdf.name}' indexado en {len(chunks)} chunks.")
+                st.success(f"'{uploaded_pdf.name}' indexed in {len(chunks)} chunks.")
             except Exception as e:
-                st.error(f"Error procesando el PDF: {e}")
+                st.error(f"Error processing the PDF: {e}")
 
     if st.session_state.processed_file:
-        st.info(f"Documento activo: {st.session_state.processed_file}")
+        st.info(f"Active document: {st.session_state.processed_file}")
 
-st.title("🛡️ Guard-RAG — Fase 1")
-st.caption("Conversa con tu PDF. El pipeline corre localmente (o con OpenAI si lo elegis).")
+st.title("🛡️ Guard-RAG")
+st.caption("Chat with your PDF. Every answer passes through injection and leakage defenses.")
 
 for message in st.session_state.chat_history:
     role = "user" if isinstance(message, HumanMessage) else "assistant"
     with st.chat_message(role):
         st.markdown(message.content)
 
-user_question = st.chat_input("Preguntale algo a tu PDF...")
+user_question = st.chat_input("Ask your PDF something...")
 
 if user_question:
     if not rate_limiter.is_allowed(st.session_state.question_timestamps):
         st.error(
-            "Alcanzaste el limite de preguntas permitidas (10 por minuto). "
-            "Espera un momento antes de volver a preguntar."
+            "You reached the question limit (10 per minute). "
+            "Wait a moment before asking again."
         )
         st.stop()
 
@@ -158,14 +158,14 @@ if user_question:
     )
 
     if st.session_state.rag_chain is None:
-        st.warning("Primero subi y procesa un PDF desde la barra lateral.")
+        st.warning("Upload and process a PDF from the sidebar first.")
         st.stop()
 
     with st.chat_message("user"):
         st.markdown(user_question)
 
     with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
+        with st.spinner("Thinking..."):
             try:
                 response = st.session_state.rag_chain.invoke(
                     {
@@ -187,7 +187,7 @@ if user_question:
 
                 st.markdown(answer)
             except Exception as e:
-                answer = f"Ocurrio un error al generar la respuesta: {e}"
+                answer = f"An error occurred while generating the answer: {e}"
                 st.error(answer)
 
     st.session_state.chat_history.append(HumanMessage(content=user_question))
