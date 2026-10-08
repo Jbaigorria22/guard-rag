@@ -32,3 +32,9 @@ variable "allowed_ingress_cidr" {
     error_message = "Usa un CIDR valido y nunca 0.0.0.0/0, que abre el ALB a todo internet."
   }
 }
+
+variable "image_tag" {
+  description = "ECR image tag to deploy. It is resolved to an immutable digest at plan time."
+  type        = string
+  default     = "v2"
+}
