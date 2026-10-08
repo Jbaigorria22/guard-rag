@@ -9,3 +9,8 @@ security_events.log
 terraform/
 *.tfstate
 eval/
+venv-eval/
+README.md
+dockerfile
+requirements-eval.txt
+.gitattributes
