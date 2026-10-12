@@ -41,6 +41,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "STREAMLIT_SERVER_HEADLESS", value = "true" },
         { name = "STREAMLIT_BROWSER_GATHER_USAGE_STATS", value = "false" },
+        { name = "PYTHONUNBUFFERED", value = "1" },       # logs reach CloudWatch immediately
+        { name = "ANONYMIZED_TELEMETRY", value = "False" }, # ChromaDB telemetry; no internet route
       ]
 
       logConfiguration = {
