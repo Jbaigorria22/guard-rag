@@ -1,6 +1,6 @@
 # 🛡️ Guard-RAG
 
-Chat with your PDFs (RAG) behind a security layer that defends against **prompt injection**, **system prompt leakage** and **request flooding**. It runs fully locally with Ollama, with OpenAI or on **Amazon Bedrock**, ships as a Docker image, comes with a reproducible **evaluation harness** (RAGAS + deterministic attack metrics), and is being prepared for deployment on AWS with Terraform.
+Chat with your PDFs (RAG) behind a security layer that defends against **prompt injection**, **system prompt leakage** and **request flooding**. It runs fully locally with Ollama, with OpenAI or on **Amazon Bedrock**, ships as a Docker image, comes with a reproducible **evaluation harness** (RAGAS + deterministic attack metrics), and is **deployed on AWS** (ECS Fargate + Bedrock) with Terraform, behind an ALB and WAF, with no NAT gateway.
 
 > The UI, prompts and code are in English. Injection detection stays bilingual (Spanish and English), and the model answers in the language of the question.
 
@@ -38,7 +38,8 @@ Question ──► Rate limit ──► Retriever (k=4, history-aware) ──►
 | [config.py](config.py) | Chunk size, default models (Ollama, OpenAI, Bedrock), AWS region, retriever `k` and system prompts |
 | [pages/1_Security_Dashboard.py](pages/1_Security_Dashboard.py) | Dashboard that reads `security_events.log` |
 | [dockerfile](dockerfile) | `python:3.11-slim` image running as a non-root user |
-| [terraform/](terraform/) | AWS infrastructure (in progress) |
+| [terraform/](terraform/) | AWS infrastructure as code (39 resources) |
+| [docs/](docs/) | Deployment evidence: screenshots and demo video |
 | [eval/](eval/) | Evaluation harness: synthetic corpus, 10-case test set, generation and scoring scripts, reports (kept out of the Docker image) |
 
 ## Requirements
@@ -67,7 +68,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open http://localhost:8501, pick a backend in the sidebar, upload a PDF and click **Procesar PDF**. The dashboard shows up as a page in the sidebar menu.
+Open http://localhost:8501, pick a backend in the sidebar, upload a PDF and click **Process PDF**. The dashboard shows up as a page in the sidebar menu.
 
 > The OpenAI API key is entered in the UI and is never written to disk.
 
@@ -84,27 +85,67 @@ If Ollama runs on your host, `localhost` inside the container points to the cont
 
 The Bedrock backend needs AWS credentials inside the container; on ECS they will come from the task role, so no keys are baked into the image.
 
-## AWS infrastructure (Terraform) — in progress
+## AWS deployment (Terraform)
 
-Already defined in [terraform/](terraform/):
+The whole stack is defined in [terraform/](terraform/) and was applied, tested end to end and destroyed (**39 resources**, nothing left billing).
 
-- **VPC** `10.0.0.0/16` with an Internet Gateway.
-- **2 public subnets** (for the ALB) and **2 private subnets** (for the container), spread across two availability zones.
-- **Route tables:** the public one routes to the internet through the IGW; the private one has no internet route.
-- **Security Groups chained by reference:**
-  - ALB: only accepts HTTP (80) from `allowed_ingress_cidr`, and can only reach the container on port 8501.
-  - Container: only accepts traffic on 8501 coming from the ALB's Security Group.
+**Demo:** [docs/video/demo.mp4](docs/video/demo.mp4): upload a PDF, normal answer, restricted question, direct injection and the security dashboard, running on AWS.
 
-Still missing: IAM roles, the image registry, the ALB, the container service, WAF and the VPC endpoints for Bedrock.
+```mermaid
+flowchart LR
+    U[Your IP /32] -->|HTTP 80| WAF[AWS WAF]
+    WAF --> ALB[Application Load Balancer<br/>public subnets]
+    ALB -->|8501| ECS[ECS Fargate task<br/>private subnets]
+    ECS -->|VPC endpoint| BR[Amazon Bedrock<br/>Claude Haiku 4.5 + Titan v2]
+    ECS -->|VPC endpoints| ECR[ECR image pull]
+    ECS -->|VPC endpoint| CW[CloudWatch Logs]
+    ECS -->|S3 gateway endpoint| S3[(S3: ECR layers)]
+```
+
+| Layer | What is deployed |
+|---|---|
+| Network | VPC `10.0.0.0/16`, 2 public subnets (ALB) and 2 private subnets (container) across two AZs, Internet Gateway, **no NAT gateway** |
+| Private access to AWS | 4 interface endpoints (`ecr.api`, `ecr.dkr`, `logs`, `bedrock-runtime`) and 1 S3 gateway endpoint: the container never needs internet egress |
+| Edge | ALB with HTTP listener restricted to `allowed_ingress_cidr` (validation rejects `0.0.0.0/0`) and WAFv2 with 3 AWS managed rule sets (Common, Known Bad Inputs, IP Reputation) plus a per-IP rate limit (1000 requests / 5 min) |
+| Compute | ECS Fargate service pulling the image **by digest** from ECR (immutable tags) |
+| Security Groups | Chained by reference: ALB accepts 80 from your IP and reaches the app only on 8501; the app accepts 8501 only from the ALB and talks only to the endpoints on 443 |
+| IAM | Two roles with least privilege and confused-deputy conditions: the execution role (ECR pull, logs) and the task role (`bedrock:InvokeModel` only) |
+| Observability | CloudWatch log group `/ecs/guard-rag-lab` with 1-month retention |
+| Models | Claude Haiku 4.5 (`us.` inference profile) and Titan Text Embeddings v2, called with the task role: no API keys anywhere |
+
+### Evidence
+
+| | |
+|---|---|
+| App answering from the PDF | [01-app-answer](docs/screenshots/01-app-answer.png) |
+| Injection blocked | [02-app-injection-blocked](docs/screenshots/02-app-injection-blocked.png) |
+| Security dashboard | [03-security-dashboard](docs/screenshots/03-security-dashboard.png) |
+| Restricted question (CEO salary) | [03b-app-ceo-salary](docs/screenshots/03b-app-ceo-salary.png) |
+| ECS service running | [04-ecs-service](docs/screenshots/04-ecs-service.png) |
+| ALB and WAF association | [05-alb-details](docs/screenshots/05-alb-details.png), [05b-alb-waf](docs/screenshots/05b-alb-waf.png) |
+| WAF rules | [06-waf-rules](docs/screenshots/06-waf-rules.png) |
+| VPC endpoints | [07-vpc-endpoints](docs/screenshots/07-vpc-endpoints.png) |
+| CloudWatch logs | [08-cloudwatch-logs](docs/screenshots/08-cloudwatch-logs.png) |
+| ECR image | [09-ecr-image](docs/screenshots/09-ecr-image.png) |
+| IAM roles | [10-iam-task-role](docs/screenshots/10-iam-task-role.png), [10b-iam-execution-role](docs/screenshots/10b-iam-execution-role.png) |
+
+Account IDs are redacted.
+
+### Deploy and destroy
+
+The ECR repository and the image (`guard-rag:v2`) are created beforehand; Terraform reads them through data sources.
 
 ```bash
 cd terraform
 terraform init
 terraform plan -var="allowed_ingress_cidr=$(curl -s https://checkip.amazonaws.com)/32"
 terraform apply -var="allowed_ingress_cidr=<YOUR_IP>/32"
+terraform output app_url
+
+terraform destroy      # stops all billing
 ```
 
-`allowed_ingress_cidr` is required and its validation rejects `0.0.0.0/0`. You can also set it in a `terraform.tfvars` file (it is in `.gitignore`).
+`allowed_ingress_cidr` is required. You can also set it in a `terraform.tfvars` file (git-ignored, like `terraform.tfstate`).
 
 | Variable | Default |
 |---|---|
@@ -112,7 +153,10 @@ terraform apply -var="allowed_ingress_cidr=<YOUR_IP>/32"
 | `project_name` | `guard-rag` |
 | `environment` | `lab` |
 | `vpc_cidr` | `10.0.0.0/16` |
+| `image_tag` | `v2` |
 | `allowed_ingress_cidr` | — (required) |
+
+**Cost:** the billable tier (interface endpoints, ALB, Fargate, WAF) runs at roughly $0.15–0.20 per hour, so the lab is applied for tests and destroyed afterwards.
 
 ## Configuration
 
@@ -206,12 +250,12 @@ It needs AWS credentials with access to the models above and costs a few cents p
 - The rate limit is stored in the Streamlit session, so opening a new tab resets it.
 - The output guardrail can produce false positives (for example, when the document legitimately talks about "system prompts").
 
-## Roadmap
+## Known limitations of the AWS deployment
 
-- [x] **Phase 1:** local RAG with Streamlit, ChromaDB and OpenAI/Ollama backends
-- [x] **Phase 2:** security layer (patterns, LLM check, output guardrail, prompt leak detection, rate limiting, logging and dashboard)
-- [x] **Phase 3:** non-root Dockerfile
-- [x] **Evaluation harness:** RAGAS + deterministic attack metrics, A/B comparison with and without defenses, sensitivity run with a weaker generator
-- [ ] **Phase 4:** AWS deployment with Terraform and Amazon Bedrock (network and Security Groups done; IAM, ECR, ALB, Fargate, WAF and Bedrock VPC endpoints pending)
-- [ ] **Hardening:** scan user questions on input, broader injection patterns, a larger and harder test set
-- [ ] **Future phases (out of scope for now):** Text-to-SQL, hybrid search (BM25 + vectors) and reranking
+The project is complete as a lab. These are deliberate scope decisions, not pending work.
+
+- **HTTP only:** no domain or certificate, by design for a lab. Access is limited to one IP by the ALB Security Group. A production deployment would add an ACM certificate, a Route 53 record and an HTTPS listener.
+- **Ephemeral state:** ChromaDB and `security_events.log` live inside the container and are lost on every task restart. A production deployment would ship the audit log to CloudWatch or S3 and use a persistent vector store.
+- **Accepted risk:** the ECR scan reports one HIGH CVE (CVE-2026-85091, `zlib` in the `python:3.11-slim` base image). The application does not reach that code path; rebuilding on an updated base image removes it.
+- **Telemetry noise:** ChromaDB's PostHog client logs "Failed to send telemetry event" lines. Harmless; pinning `posthog<6` removes them.
+- **Non-deterministic follow-ups:** retrieval runs again on every turn, so after an injection attempt the model once retracted a correct earlier answer. A larger test set would be needed to measure it.
