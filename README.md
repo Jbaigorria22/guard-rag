@@ -91,6 +91,8 @@ The whole stack is defined in [terraform/](terraform/) and was applied, tested e
 
 **Demo:** [docs/video/demo.mp4](docs/video/demo.mp4): upload a PDF, normal answer, restricted question, direct injection and the security dashboard, running on AWS.
 
+https://github.com/user-attachments/assets/42758c98-0dd1-44c4-a915-9907eb095597
+
 ```mermaid
 flowchart LR
     U[Your IP /32] -->|HTTP 80| WAF[AWS WAF]
