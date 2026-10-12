@@ -243,19 +243,15 @@ It needs AWS credentials with access to the models above and costs a few cents p
 
 ## Known limitations
 
+This is a lab project. These are deliberate scope decisions, and each one says what a production version would do.
+
+**Security layer**
 - The regex patterns are not exhaustive; they are the first line of defense. The evaluation's injection (`ignora todas las instrucciones anteriores`) matches none of the 16 patterns and is only caught by the semantic layer.
 - User questions are **not scanned on input**: direct injections rely on the model's own behavior and the output guardrail.
-- Quarantine is per chunk: any legitimate content that shares a chunk with injected text is excluded too.
-- The LLM check is **fail-open**: if the model call fails, the chunk is let through. It also adds one LLM call per chunk, so large PDFs take longer.
-- The rate limit is stored in the Streamlit session, so opening a new tab resets it.
-- The output guardrail can produce false positives (for example, when the document legitimately talks about "system prompts").
+- Quarantine is per chunk: legitimate content that shares a chunk with injected text is excluded too.
+- The LLM check is **fail-open** (if the model call fails, the chunk is let through) and adds one LLM call per chunk. In production I would fail closed and use a different model for the check than for generation.
 
-## Known limitations of the AWS deployment
-
-The project is complete as a lab. These are deliberate scope decisions, not pending work.
-
-- **HTTP only:** no domain or certificate, by design for a lab. Access is limited to one IP by the ALB Security Group. A production deployment would add an ACM certificate, a Route 53 record and an HTTPS listener.
-- **Ephemeral state:** ChromaDB and `security_events.log` live inside the container and are lost on every task restart. A production deployment would ship the audit log to CloudWatch or S3 and use a persistent vector store.
-- **Accepted risk:** the ECR scan reports one HIGH CVE (CVE-2026-85091, `zlib` in the `python:3.11-slim` base image). The application does not reach that code path; rebuilding on an updated base image removes it.
-- **Telemetry noise:** ChromaDB's PostHog client logs "Failed to send telemetry event" lines. Harmless; pinning `posthog<6` removes them.
-- **Non-deterministic follow-ups:** retrieval runs again on every turn, so after an injection attempt the model once retracted a correct earlier answer. A larger test set would be needed to measure it.
+**AWS deployment**
+- **HTTP only, restricted to one IP.** Production would add an ACM certificate, a Route 53 record and an HTTPS listener.
+- **Ephemeral state.** ChromaDB and `security_events.log` live inside the container and are lost on restart. Production would ship the audit log to CloudWatch or S3 and use a persistent vector store.
+- **Accepted risk.** The ECR scan reports one HIGH CVE (CVE-2026-85091, `zlib` in the `python:3.11-slim` base image). The application does not reach that code path, and rebuilding on an updated base image removes it.
